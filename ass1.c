@@ -72,12 +72,14 @@ int main() {
             }
             args[arg_count] = NULL;
 
-            if (arg_count > 1) {
+            if (arg_count == 1) {
+                printf("Usage: cd <directory>\n");
+            } else if (arg_count > 2) {
+                printf("cd: Too many arguments\n");
+            } else {
                 if (chdir(args[1]) == -1) {
                     perror("chdir");
                 }
-            } else {
-                printf("Usage: cd <directory>\n");
             }
         } else {
             execute_command(command);
