@@ -7,6 +7,7 @@
 
 #define MAX_COMMAND_LENGTH 1024
 #define MAX_ARGUMENTS 64
+#define MAX_HISTORY 10
 
 void execute_command(char *command) {
     pid_t child_pid;
@@ -39,8 +40,22 @@ void execute_command(char *command) {
     }
 }
 
+void update_history(char history[MAX_HISTORY][MAX_COMMAND_LENGTH], int *history_count, const char *command) {
+    if (*history_count < MAX_HISTORY) {
+        strcpy(history[*history_count], command);
+        (*history_count)++;
+    } else {
+        for (int i = 0; i < MAX_HISTORY - 1; i++) {
+            strcpy(history[i], history[i + 1]);
+        }
+        strcpy(history[MAX_HISTORY - 1], command);
+    }
+}
+
 int main() {
     char command[MAX_COMMAND_LENGTH];
+    char history[MAX_HISTORY][MAX_COMMAND_LENGTH];
+    int history_count = 0;
     
     while (1) {
         printf("MT L458 > ");  // Print the command prompt
@@ -53,12 +68,14 @@ int main() {
 
         // Remove trailing newline character
         command[strcspn(command, "\n")] = '\0';
+        update_history(history, &history_count, command);
 
         if (strcmp(command, "exit") == 0) {
             // Exit the shell
             printf("Exiting shell...\n");
             break;
         } else if (strncmp(command, "cd", 2) == 0) {
+
             // Change directory command
             char *args[MAX_ARGUMENTS];
             int arg_count = 0;
@@ -80,6 +97,11 @@ int main() {
                 if (chdir(args[1]) == -1) {
                     perror("chdir");
                 }
+            }
+        } else if (strcmp(command, "history") == 0) {
+            printf("Command history:\n");
+            for (int i = 0; i < history_count; i++) {
+                printf("%d. %s\n", i + 1, history[i]);
             }
         } else {
             execute_command(command);
