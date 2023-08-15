@@ -41,15 +41,9 @@ void execute_command(char *command) {
 
 int main() {
     char command[MAX_COMMAND_LENGTH];
-    char current_directory[MAX_COMMAND_LENGTH]; // Store current directory
     
     while (1) {
-        if (getcwd(current_directory, sizeof(current_directory)) == NULL) {
-            perror("getcwd");
-            return 1;
-        }
-
-        printf("MT L458 %s > ", current_directory);  // Print the command prompt
+        printf("MT L458 > ");  // Print the command prompt
         
         if (fgets(command, MAX_COMMAND_LENGTH, stdin) == NULL) {
             // Handle Ctrl+C or EOF
