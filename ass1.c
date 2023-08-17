@@ -39,10 +39,27 @@ void execute_command(char *command, char history[MAX_HISTORY][MAX_COMMAND_LENGTH
                 perror("chdir");
             }
         }
-    } else if (strcmp(command, "history") == 0) {
-        printf("Command history:\n");
-        for (int i = 0; i < *history_count; i++) {
-            printf("%d. %s\n", i + 1, history[i]);
+    } else if (strncmp(command, "history", 7) == 0) {
+        int n = 0;
+        if (sscanf(command, "history %d", &n) == 1) {
+            if (n <= 0) {
+                printf("Invalid history count.\n");
+                return;
+            }
+
+            int start_index = (*history_count - n) < 0 ? 0 : (*history_count - n);
+
+            printf("Command history (last %d commands):\n", n);
+            for (int i = start_index; i < *history_count; i++) {
+                printf("%d. %s\n", i + 1, history[i]);
+            }
+        } else if (strcmp(command, "history") == 0) {
+            printf("Command history:\n");
+            for (int i = 0; i < *history_count; i++) {
+                printf("%d. %s\n", i + 1, history[i]);
+            }
+        } else {
+            printf("numeric argument required\n");
         }
     }
     else{
