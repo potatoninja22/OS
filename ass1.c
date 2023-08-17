@@ -7,7 +7,7 @@
 
 #define MAX_COMMAND_LENGTH 1024
 #define MAX_ARGUMENTS 64
-#define MAX_HISTORY 10
+#define MAX_HISTORY 100
 
 void execute_command(char *command, char history[MAX_HISTORY][MAX_COMMAND_LENGTH], int * history_count) {
     
