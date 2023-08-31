@@ -52,30 +52,33 @@ double durationComparator(const void *a, const void *b) {
 //........................................................................................................................................
 
 
-Output* fcfs(struct Process *vp, int n) {
-    Output* output = (Output*)malloc(sizeof(Output));
+Output fcfs(struct Process *vp, int n) {
+    Output output;
+
+    output.schedule = NULL;
 
     qsort(vp, n, sizeof(struct Process), startTimeComparator);
-
-    output->schedule = (Process* )malloc(n*(sizeof(Process)));
-
-    for(int i=0;i<n;i++){
-        printf("pid: %s\n", vp[i].pid);
-    }
 
     double totalTurnaroundTime = 0.0;
     double totalResponseTime = 0.0;
     double currTime = 0.0;
-    
+    output.size = 0;
+
     for (int i = 0; i < n; i++) {
         //currTime = (vp[i].startTime > currTime) ? vp[i].startTime : currTime;
+        //printf("%d\n", i);
+        output.size++;
+        output.schedule = (Process* )realloc(output.schedule, output.size*(sizeof(Process)));
+
         currTime = max(currTime, vp[i].startTime);
         double endTime = currTime + vp[i].completionTime;
 
         //output->schedule[i].pid = vp[i].pid;
-        output->schedule[i].pid = vp[i].pid;
-        output->schedule[i].startTime = currTime;
-        output->schedule[i].completionTime = endTime;
+        output.schedule[i].pid = vp[i].pid;
+        output.schedule[i].startTime = currTime;
+        output.schedule[i].completionTime = endTime;
+
+        //printf("%.6f %.6f\n", output.schedule[i].startTime, output.schedule[i].completionTime);
         
         totalTurnaroundTime += endTime - vp[i].startTime;
         totalResponseTime += currTime - vp[i].startTime;
@@ -83,9 +86,8 @@ Output* fcfs(struct Process *vp, int n) {
         currTime = endTime;
     }
     
-    output->avgTurnaroundTime = totalTurnaroundTime / n;
-    output->avgResponseTime = totalResponseTime / n;
-    output->size = n;
+    output.avgTurnaroundTime = totalTurnaroundTime / n;
+    output.avgResponseTime = totalResponseTime / n;
     
     return output;
 }
@@ -134,11 +136,11 @@ int main(int argc, char *argv[]) {
     //     printf("%s %0.6f %0.f\n",processes[i].pid,processes[i].startTime,processes[i].completionTime);
     // }
 
-    Output* outfcfs = fcfs(processes, numEntries);
-    int n = outfcfs->size;
+    Output outfcfs = fcfs(processes, numEntries);
+    int n = outfcfs.size;
 
     for(int i=0;i<n;i++){
-        printf("%s %.6f %.6f\n", outfcfs->schedule[i].pid, outfcfs->schedule[i].startTime, outfcfs->schedule[i].completionTime);
+        printf("%s %.6f %.6f\n", outfcfs.schedule[i].pid, outfcfs.schedule[i].startTime, outfcfs.schedule[i].completionTime);
     }
 
     FILE *outputFile = fopen(outputFileName, "w");
