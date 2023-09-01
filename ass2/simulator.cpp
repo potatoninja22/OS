@@ -133,8 +133,6 @@ vector<pair<string, pair<int,int>>> srtf(vector<Process* > temp){
 vector<pair<string, pair<int, int>>> roundrobin(vector<Process* > vp, int slice){
     vector<pair<string, pair<int,int>>> schedule;
     sort(vp.begin(), vp.end(), Process:: startTimeComparator);
-    vector<int> rem;
-    for(auto it: vp) rem.push_back(it->getCompletionTime());
     int n = vp.size();
     int i=0;
     int currTime = 0;

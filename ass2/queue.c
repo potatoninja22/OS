@@ -12,17 +12,19 @@ struct Queue {
     queuePair items[MAX_SIZE];
     int front;
     int rear;
+    int size;
 };
 
 struct Queue* createQueue() {
     struct Queue* queue = (struct Queue*)malloc(sizeof(struct Queue));
     queue->front = -1;
     queue->rear = -1;
+    queue->size = 0;
     return queue;
 }
 
 int isEmpty(struct Queue* queue) {
-    return queue->front == -1;
+    return queue->size == 0;
 }
 
 void enqueue(struct Queue* queue, queuePair qp) {
@@ -35,6 +37,7 @@ void enqueue(struct Queue* queue, queuePair qp) {
     }
     queue->rear++;
     queue->items[queue->rear] = qp;
+    queue->size++;
 }
 
 queuePair dequeue(struct Queue* queue) {
@@ -49,6 +52,7 @@ queuePair dequeue(struct Queue* queue) {
     if (queue->front > queue->rear) {
         queue->front = queue->rear = -1;
     }
+    queue->size--;
     return qp;
 }
 

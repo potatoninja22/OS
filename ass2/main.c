@@ -6,6 +6,7 @@
 #include <math.h>
 #include <limits.h>
 #include "heap.c"
+#include "queue.c"
 
 #define max(a, b) ((a) > (b) ? (a) : (b))
 
@@ -41,6 +42,13 @@ int startTimeComparator(const void *a, const void *b) {
         return -1;
     } else if (processA->startTime > processB->startTime) {
         return 1;
+    } else{
+        if(processA->completionTime < processB->completionTime) {
+            return -1;
+        }
+        else if(processA->completionTime > processB->completionTime){
+            return 1;
+        }
     }
     return 0;
 }
@@ -164,15 +172,13 @@ Output srtf(struct Process *vp, int n) {
             output.schedule = (Process* )realloc(output.schedule, output.size*(sizeof(Process)));
 
             double remaining = currProc.first;
-            double prevTime;
+            double prevTime = currTime;
             if(nextTime - currTime < remaining){
-                prevTime = currTime;
                 currProc.first = remaining - nextTime + currTime;
                 currTime = nextTime;
                 insert(minHeap, currProc);
             }
             else{
-                prevTime = currTime;
                 currTime += remaining;
                 currProc.first = 0;
             }
@@ -181,6 +187,60 @@ Output srtf(struct Process *vp, int n) {
             output.schedule[output.size-1].startTime = prevTime;
             output.schedule[output.size-1].completionTime = currTime;
             
+        }
+    }
+    // output.avgTurnaroundTime = totalTurnaroundTime / n;
+    // output.avgResponseTime = totalResponseTime / n;
+    
+    return output;
+}
+
+Output roundrobin(struct Process *vp, int n, double slice) {
+    Output output;
+    output.schedule = NULL;
+    output.size = 0;
+
+    qsort(vp, n, sizeof(struct Process), startTimeComparator);
+
+    int i=0;
+    double currTime = 0.0;
+    int completed = 0;
+
+    struct Queue* q = createQueue();
+
+    while(completed != n){
+        while(i<n && vp[i].startTime <= currTime){
+            queuePair temp = {vp[i].completionTime, vp[i].pid};
+            enqueue(q, temp);
+            i++;
+        }
+        
+        if(q->size > 0){
+            queuePair temp = dequeue(q);
+            double remaining = temp.first;
+            double prevTime = currTime;
+            if(remaining > slice){
+                temp.first = remaining-slice;
+                currTime += slice;
+                while(i<n && vp[i].startTime <= currTime){
+                    queuePair nextProc = {vp[i].completionTime, vp[i].pid};
+                    enqueue(q, nextProc);
+                    i++;
+                }
+                enqueue(q, temp);
+            }
+            else{
+                currTime += remaining;
+                completed++;
+            }
+            output.size++;
+            output.schedule = (Process* )realloc(output.schedule, output.size*(sizeof(Process)));
+            output.schedule[output.size-1].pid = temp.pid;
+            output.schedule[output.size-1].startTime = prevTime;
+            output.schedule[output.size-1].completionTime = currTime;
+        }
+        else{
+            currTime = vp[i].startTime;
         }
     }
     // output.avgTurnaroundTime = totalTurnaroundTime / n;
@@ -233,7 +293,7 @@ int main(int argc, char *argv[]) {
     //     printf("%s %0.6f %0.f\n",processes[i].pid,processes[i].startTime,processes[i].completionTime);
     // }
 
-    Output outfcfs = srtf(processes, numEntries);
+    Output outfcfs = roundrobin(processes, numEntries, 5.000);
     int n = outfcfs.size;
 
     for(int i=0;i<n;i++){
