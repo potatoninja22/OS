@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "heap.c"
+
 #define max(a, b) ((a) > (b) ? (a) : (b))
 
 typedef struct Process {
@@ -88,6 +90,47 @@ Output fcfs(struct Process *vp, int n) {
     
     output.avgTurnaroundTime = totalTurnaroundTime / n;
     output.avgResponseTime = totalResponseTime / n;
+    
+    return output;
+}
+
+
+Output sjf(struct Process *vp, int n) {
+    Output output;
+
+    output.schedule = NULL;
+
+    qsort(vp, n, sizeof(struct Process), startTimeComparator);
+
+    // double totalTurnaroundTime = 0.0;
+    // double totalResponseTime = 0.0;
+    int i=0;
+    double currTime = 0.0;
+    output.size = 0;
+    struct MinHeap* minHeap = createMinHeap(n);
+    while(i<n || minHeap->size > 0){
+        if(minHeap->size == 0) currTime = max(currTime, vp[i].startTime);
+        for(;i<n;i++){
+            if(vp[i].startTime <= currTime){
+                heapPair temp = { vp[i].completionTime, vp[i].pid };
+                insert(minHeap, temp);
+            }
+            else break;
+        }
+
+        heapPair currProc = extractMin(minHeap);
+        output.size++;
+        
+        output.schedule = (Process* )realloc(output.schedule, output.size*(sizeof(Process)));
+        output.schedule[output.size-1].pid = currProc.pid;
+        output.schedule[output.size-1].startTime = currTime;
+        output.schedule[output.size-1].completionTime = currTime + currProc.first;
+
+        currTime += currProc.first;
+
+    }
+    // output.avgTurnaroundTime = totalTurnaroundTime / n;
+    // output.avgResponseTime = totalResponseTime / n;
     
     return output;
 }

@@ -56,19 +56,19 @@ vector<pair<string, pair<int,int>>> fcfs (vector<Process* > vp){
 vector<pair<string,pair<int,int>>> sjf(vector<Process* > vp){
     vector<pair<string,pair<int,int>>> schedule;
     sort(vp.begin(), vp.end(), Process::startTimeComparator);
-    map<Process*, bool> mp;
+    //map<Process*, bool> mp;
     int n = vp.size();
     int i=0; int currTime = 0;
     priority_queue<Process*, vector<Process*>, decltype(&Process::durationComparator)> pq(Process:: durationComparator);
     while(i<n || pq.size() > 0){
         if(pq.size() == 0) currTime = max(currTime, vp[i]->getStartTime());
         for(;i<n;i++){
-            if(vp[i]->getStartTime() <= currTime && mp.find(vp[i]) == mp.end()) pq.push(vp[i]);
+            if(vp[i]->getStartTime() <= currTime) pq.push(vp[i]);
             else break;
         }
         auto proc = pq.top();
         pq.pop();
-        mp[proc] = true;
+        //mp[proc] = true;
         schedule.push_back(make_pair(proc->getPid(), make_pair(currTime, currTime + proc->getCompletionTime())));
         currTime += proc->getCompletionTime();
     }
@@ -182,17 +182,20 @@ int main(){
     // int lamda = argv[2];  // inter-arrival time parameter
     vector<Process* > listProcess;   // list to store all the processes
 
-    Process* process1 = new Process("Job1", 1, 100);
-    Process* process2 = new Process("Job2", 5, 3);
-    Process* process3 = new Process("Job3", 4, 5);
-    Process* process4 = new Process("Job4", 20, 2);
+    Process* process1 = new Process("Job1", 2, 6);
+    Process* process2 = new Process("Job2", 5, 2);
+    Process* process3 = new Process("Job3", 1, 8);
+    Process* process4 = new Process("Job4", 0, 3);
+    Process* process5 = new Process("Job5", 4, 4);
+
 
     listProcess.push_back(process1);
     listProcess.push_back(process2);
     listProcess.push_back(process3);
     listProcess.push_back(process4);
+    listProcess.push_back(process5);
 
-    auto ans = roundrobin(listProcess, 3);
+    auto ans = sjf(listProcess);
     for(auto it:ans){
         cout<<it.first<<" "<<it.second.first<<" "<<it.second.second<<endl;
     }
