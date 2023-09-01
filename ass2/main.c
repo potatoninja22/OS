@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <limits.h>
 #include "heap.c"
 
 #define max(a, b) ((a) > (b) ? (a) : (b))
@@ -135,6 +136,59 @@ Output sjf(struct Process *vp, int n) {
     return output;
 }
 
+Output srtf(struct Process *vp, int n) {
+    Output output;
+    output.schedule = NULL;
+    output.size = 0;
+
+    qsort(vp, n, sizeof(struct Process), startTimeComparator);
+
+    int i=0;
+    double currTime = 0.0;
+    double nextTime = 0.0;
+
+    struct MinHeap* minHeap = createMinHeap(n);
+
+    while(i<n){
+        currTime = vp[i].startTime;
+        while(i<n && vp[i].startTime == currTime){
+            heapPair temp = { vp[i].completionTime, vp[i].pid };
+            insert(minHeap, temp);
+            i++;
+        }
+        nextTime = (i == n)? INT_MAX: vp[i].startTime;
+
+        while(minHeap->size > 0 && currTime < nextTime) {
+            heapPair currProc = extractMin(minHeap);
+            output.size++;
+            output.schedule = (Process* )realloc(output.schedule, output.size*(sizeof(Process)));
+
+            double remaining = currProc.first;
+            double prevTime;
+            if(nextTime - currTime < remaining){
+                prevTime = currTime;
+                currProc.first = remaining - nextTime + currTime;
+                currTime = nextTime;
+                insert(minHeap, currProc);
+            }
+            else{
+                prevTime = currTime;
+                currTime += remaining;
+                currProc.first = 0;
+            }
+
+            output.schedule[output.size-1].pid = currProc.pid;
+            output.schedule[output.size-1].startTime = prevTime;
+            output.schedule[output.size-1].completionTime = currTime;
+            
+        }
+    }
+    // output.avgTurnaroundTime = totalTurnaroundTime / n;
+    // output.avgResponseTime = totalResponseTime / n;
+    
+    return output;
+}
+
 //.......................................................................................................................................
 
 int main(int argc, char *argv[]) {
@@ -179,7 +233,7 @@ int main(int argc, char *argv[]) {
     //     printf("%s %0.6f %0.f\n",processes[i].pid,processes[i].startTime,processes[i].completionTime);
     // }
 
-    Output outfcfs = fcfs(processes, numEntries);
+    Output outfcfs = srtf(processes, numEntries);
     int n = outfcfs.size;
 
     for(int i=0;i<n;i++){
