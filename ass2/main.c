@@ -16,17 +16,6 @@ typedef struct Process {
     double completionTime;
 }Process;
 
-// //return type
-// typedef struct{
-//     double startTime;
-//     double endTime;
-// } Pair; 
-
-// typedef struct {
-//     char* pid;
-//     Pair second;
-// }PairPair;
-
 typedef struct {
     Process* schedule;
     double avgTurnaroundTime;

@@ -196,54 +196,47 @@ vector<pair<string, pair<int, int>>> MLFQ(vector<Process* > vp, int slice1, int 
             while(i<n && vp[i]->getStartTime() <= currTime)
             q1.push_back(vp[i++]);
         }
-        if (currTime == boostTime) {
+        if (currTime >= boostTime) {
             Qboost(q1, q2, q3, boostTime, boost);
         }
         while (!q1.empty()) {
-            auto p = q1.front();
+            Process* p = q1.front();
             q1.pop();
             int rem = p->getCompletionTime();
             prevTime = currTime;   // this is what our time is right now. 
             if(rem > slice1){          // if rem is greater than slice1, we will check for new arrivals and boosts between prevTime and prevTime + slice1. After this our current job will get finished and we will push it to queue2
                 nexTime = prevTime + slice1;   // take into account whatever happens between prevTime and nexTime (arrival + boost)
-                while(boostTime >= prevTime && boostTime <= nextTime){
-                    for(;i<n && vp[i]->getStartTime()<=boostTime;i++){
+
+                if(boostTime > prevTime && boostTime < nextTime){
+                    for(;i<n && vp[i]->getStartTime() >= prevTime && vp[i]->getStartTime() <= boostTime;i++){
                         q1.push(vp[i]);
                     }
-                    currTime = boostTime;
+                    int temp = boostTime;
                     Qboost(q1, q2, q3, boostTime, boost);
+                    for(;i<n && vp[i]->getStartTime() >= temp && vp[i]->getStartTime() <= nextTime;i++){
+                        q1.push(vp[i]);
+                    }
                 }
-
-                for(;i<n && vp[i]->getStartTime()<=nextTime && vp[i]->getStartTime() >= currTime;i++){
-                    q1.push(vp[i]);
-                }
-
                 // now everything that was supposed to happen in the intermediate time interval has happened, and I can set currTime to nextTime
                 // I will also push the process to Q2 since it did not get completed within the time slice
-                currTime = nextTime;
+                currTime = nextTime;                
                 schedule.push_back({p->getPid(), {prevTime, currTime}});
                 p->setCompletionTime(rem-slice1);
                 q2.push(p);
             }
             else{
                 nextTime = prevTime + rem;
-                while(boostTime >= prevTime && boostTime <= nextTime){
-                    for(;i<n && vp[i]->getStartTime()<=boostTime;i++){
-                        q1.push(vp[i]);
-                    }
-                    currTime = boostTime;
-                    Qboost(q1, q2, q3, boostTime, boost);
-                }
-
-                for(;i<n && vp[i]->getStartTime()<=nextTime && vp[i]->getStartTime() >= currTime;i++){
+                // first take in all new arrivals in between nextTime and prevTime
+                for(;i<n && vp[i]->getStartTime()<=nextTime;i++){
                     q1.push(vp[i]);
                 }
-
                 // now everything that was supposed to happen in the intermediate time interval has happened, and I can set currTime to nextTime
                 // the process p is complete, so no need to push to q2
                 currTime = nextTime;
+                if(currTime >= boostTime){
+                    Qboost(q1, q2, q3, boostTime, boost);
+                }
                 schedule.push_back({p->getPid(), {prevTime, currTime}});
-
             }
 
         // now we come to the time when q1 has become empty and q2 is non empty. We will consider time slice2; First process in q2 will run from 
@@ -251,10 +244,7 @@ vector<pair<string, pair<int, int>>> MLFQ(vector<Process* > vp, int slice1, int 
         while (!q2.empty() && q1.empty()) {
             Process p = q2.front();
             q2.pop_front();
-            if (sl2.find(p.pid) == sl2.end()) {
-                sl2[p.pid] = slice2;
-            }
-            time = std::max(time, p.start_time);
+            currTime = max(currTime, p->getStartTime());
 
             if (i < processes.size() && processes[i].start_time < time + std::min(p.remaining_time, sl2[p.pid])) {
                 q1.push_back(processes[i++]);
