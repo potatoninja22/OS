@@ -238,27 +238,161 @@ Output roundrobin(struct Process *vp, int n, double slice) {
     return output;
 }
 
+
+void Qboost (struct Queue* q1, struct Queue* q2, struct Queue* q3, double *boostTime, double boost){
+    while(q2->size > 0){
+        queuePair temp = dequeue(q2);
+        enqueue(q1, temp);
+    }
+    while(q3->size > 0){
+        queuePair temp = dequeue(q3);
+        enqueue(q1, temp);
+    }
+    *boostTime += boost;
+    return;
+}
+
 Output mlfq(struct Process *vp, int n, double slice1, double slice2, double slice3, double boost) {
     Output output;
     output.schedule = NULL;
     output.size = 0;
 
     qsort(vp, n, sizeof(struct Process), startTimeComparator);
-
     int i=0;
-    double currTime = 0.0;
-    int completed = 0;
+    double currTime = 0.0, nextTime = 0, prevTime = 0;
+    double boost_var = 0;
+    double* boostTime = &boost_var;
+    *boostTime = boost;
 
     struct Queue* q1 = createQueue();
     struct Queue* q2 = createQueue();
     struct Queue* q3 = createQueue();
- 
-    while(completed != n){
+    while(i<n || q1->size > 0 || q2->size > 0 || q3->size > 0){
+        if(q1->size == 0 && q2->size == 0 && q3->size == 0){
+            currTime = max(currTime, vp[i].startTime);
+            while(i<n && vp[i].startTime <= currTime){
+                queuePair temp = {vp[i].completionTime, vp[i].pid};
+                enqueue(q1, temp);
+                i++;
+            }
+        }
+
+        if(currTime >= *boostTime){
+            Qboost(q1, q2, q3, boostTime, boost);
+        }
+
+        while(q1->size > 0){
+            queuePair qp = dequeue(q1);
+            int rem = qp.first;
+            prevTime = currTime;   // this is what our time is right now. 
+            if(rem > slice1){       
+                nextTime = prevTime + slice1; 
+                for(;i<n && vp[i].startTime <= nextTime;i++){
+                    queuePair temp = {vp[i].completionTime, vp[i].pid};
+                    enqueue(q1, temp);
+                } 
+                currTime = nextTime;                
+                output.size++;
+                output.schedule = (Process* )realloc(output.schedule, output.size*(sizeof(Process)));
+                output.schedule[output.size-1].pid = qp.pid;
+                output.schedule[output.size-1].startTime = prevTime;
+                output.schedule[output.size-1].completionTime = currTime;
+                qp.first = (rem-slice1);
+                enqueue(q2, qp);
+            }
+            else{
+                nextTime = prevTime + rem;
+                for(;i<n && vp[i].startTime <= nextTime;i++){
+                    queuePair temp = {vp[i].completionTime, vp[i].pid};
+                    enqueue(q1, temp);
+                } 
+                currTime = nextTime;                
+                output.size++;
+                output.schedule = (Process* )realloc(output.schedule, output.size*(sizeof(Process)));
+                output.schedule[output.size-1].pid = qp.pid;
+                output.schedule[output.size-1].startTime = prevTime;
+                output.schedule[output.size-1].completionTime = currTime;
+            }
+            if(currTime >= *boostTime) Qboost(q1, q2, q3, boostTime, boost);
+
+        }
+
+        if(currTime >= *boostTime) Qboost(q1, q2, q3, boostTime, boost);
+
+        while (q2->size > 0 && q1->size == 0) {
+            queuePair qp = dequeue(q2);
+            int rem = qp.first;
+            prevTime = currTime;   // this is what our time is right now. 
+            if(rem > slice2){       
+                nextTime = prevTime + slice2; 
+                for(;i<n && vp[i].startTime <= nextTime;i++){
+                    queuePair temp = {vp[i].completionTime, vp[i].pid};
+                    enqueue(q1, temp);
+                } 
+                currTime = nextTime;                
+                output.size++;
+                output.schedule = (Process* )realloc(output.schedule, output.size*(sizeof(Process)));
+                output.schedule[output.size-1].pid = qp.pid;
+                output.schedule[output.size-1].startTime = prevTime;
+                output.schedule[output.size-1].completionTime = currTime;
+                qp.first = (rem-slice2);
+                enqueue(q3, qp);
+            }
+            else{
+                nextTime = prevTime + rem;
+                for(;i<n && vp[i].startTime <= nextTime;i++){
+                    queuePair temp = {vp[i].completionTime, vp[i].pid};
+                    enqueue(q1, temp);
+                } 
+                currTime = nextTime;                
+                output.size++;
+                output.schedule = (Process* )realloc(output.schedule, output.size*(sizeof(Process)));
+                output.schedule[output.size-1].pid = qp.pid;
+                output.schedule[output.size-1].startTime = prevTime;
+                output.schedule[output.size-1].completionTime = currTime;
+            }
+            if(currTime >= *boostTime) Qboost(q1, q2, q3, boostTime, boost);
+        }
+
+        while (q3->size > 0 && q2->size == 0 && q1->size == 0) {
+            queuePair qp = dequeue(q3);
+            int rem = qp.first;
+            prevTime = currTime;   // this is what our time is right now. 
+            if(rem > slice3){       
+                nextTime = prevTime + slice3; 
+                for(;i<n && vp[i].startTime <= nextTime;i++){
+                    queuePair temp = {vp[i].completionTime, vp[i].pid};
+                    enqueue(q1, temp);
+                } 
+                currTime = nextTime;                
+                output.size++;
+                output.schedule = (Process* )realloc(output.schedule, output.size*(sizeof(Process)));
+                output.schedule[output.size-1].pid = qp.pid;
+                output.schedule[output.size-1].startTime = prevTime;
+                output.schedule[output.size-1].completionTime = currTime;
+                qp.first = (rem-slice3);
+                enqueue(q3, qp);
+            }
+            else{
+                nextTime = prevTime + rem;
+                for(;i<n && vp[i].startTime <= nextTime;i++){
+                    queuePair temp = {vp[i].completionTime, vp[i].pid};
+                    enqueue(q1, temp);
+                } 
+                currTime = nextTime;                
+                output.size++;
+                output.schedule = (Process* )realloc(output.schedule, output.size*(sizeof(Process)));
+                output.schedule[output.size-1].pid = qp.pid;
+                output.schedule[output.size-1].startTime = prevTime;
+                output.schedule[output.size-1].completionTime = currTime;
+            }
+            if(currTime >= *boostTime) Qboost(q1, q2, q3, boostTime, boost);
+        }
+
         
     }
     // output.avgTurnaroundTime = totalTurnaroundTime / n;
     // output.avgResponseTime = totalResponseTime / n;
-    
     return output;
 }
 
@@ -303,13 +437,13 @@ int main(int argc, char *argv[]) {
     }
 
     printf("%d\n",numEntries);
-    // for(int i=0;i<numEntries;i++){
-    //     printf("%s %0.6f %0.f\n",processes[i].pid,processes[i].startTime,processes[i].completionTime);
-    // }
-
-    Output outfcfs = roundrobin(processes, numEntries, 5.000);
+    for(int i=0;i<numEntries;i++){
+        printf("%s %0.6f %0.f\n",processes[i].pid,processes[i].startTime,processes[i].completionTime);
+    }
+    printf("hello1");
+    Output outfcfs = mlfq(processes, numEntries, 2, 5, 10, 20);
     int n = outfcfs.size;
-
+    printf("hello2");
     for(int i=0;i<n;i++){
         printf("%s %.6f %.6f\n", outfcfs.schedule[i].pid, outfcfs.schedule[i].startTime, outfcfs.schedule[i].completionTime);
     }
