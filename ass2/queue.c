@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define MAX_SIZE 1000000
+#define MAX_SIZE 100
 
 typedef struct queuePair {
     double first;
@@ -28,15 +28,18 @@ int isEmpty(struct Queue* queue) {
 }
 
 void enqueue(struct Queue* queue, queuePair qp) {
+    printf("enqueue opration being done\n");
     if (queue->rear == MAX_SIZE - 1) {
         printf("Queue is full. Cannot enqueue.\n");
         return;
     }
     if (isEmpty(queue)) {
+        printf("queue was empty\n");
         queue->front = 0;
     }
     queue->rear++;
     queue->items[queue->rear] = qp;
+    printf("%s\n", qp.pid);
     queue->size++;
 }
 

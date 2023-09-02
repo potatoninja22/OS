@@ -1,14 +1,136 @@
-//.......................................................................................................................................
-//........................................................................................................................................
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include <limits.h>
-#include "heap.c"
-#include "queue.c"
 #define max(a, b) ((a) > (b) ? (a) : (b))
-//........................................................................................................................................
+#define MAX_SIZE 100000
+
+typedef struct queuePair {
+    double first;
+    char* pid;
+}queuePair;
+struct Queue {
+    queuePair items[MAX_SIZE];
+    int front;
+    int rear;
+    int size;
+};
+struct Queue* createQueue() {
+    struct Queue* queue = (struct Queue*)malloc(sizeof(struct Queue));
+    queue->front = -1;
+    queue->rear = -1;
+    queue->size = 0;
+    return queue;
+}
+int isEmpty(struct Queue* queue) {
+    return queue->size == 0;
+}
+void enqueue(struct Queue* queue, queuePair qp) {
+    if (queue->rear == MAX_SIZE - 1) {
+        printf("Queue is full. Cannot enqueue.\n");
+        return;
+    }
+    if (isEmpty(queue)) {
+        queue->front = 0;
+    }
+    queue->rear++;
+    queue->items[queue->rear] = qp;
+    queue->size++;
+}
+queuePair dequeue(struct Queue* queue) {
+    if (isEmpty(queue)) {
+        printf("Queue is empty. Cannot dequeue.\n");
+        queuePair* qp = malloc(sizeof(queuePair));
+        qp->first = -1;
+        return *qp;
+    }
+    queuePair qp = queue->items[queue->front];
+    queue->front++;
+    if (queue->front > queue->rear) {
+        queue->front = queue->rear = -1;
+    }
+    queue->size--;
+    return qp;
+}
+
+typedef struct heapPair {
+    double first;
+    char* pid;
+}heapPair;
+typedef struct MinHeap {
+    struct heapPair* array;
+    int capacity;
+    int size;
+}MinHeap;
+void swap(struct heapPair* a, struct heapPair* b) {
+    struct heapPair temp = *a;
+    *a = *b;
+    *b = temp;
+}
+struct MinHeap* createMinHeap(int capacity) {
+    struct MinHeap* minHeap = (struct MinHeap*)malloc(sizeof(struct MinHeap));
+    minHeap->array = (struct heapPair*)malloc(sizeof(struct heapPair) * capacity);
+    minHeap->capacity = capacity;
+    minHeap->size = 0;
+    return minHeap;
+}
+void heapify(struct MinHeap* minHeap, int i) {
+    int smallest = i;
+    int left = 2 * i + 1;
+    int right = 2 * i + 2;
+
+    if (left < minHeap->size && minHeap->array[left].first < minHeap->array[smallest].first)
+        smallest = left;
+    if (right < minHeap->size && minHeap->array[right].first < minHeap->array[smallest].first)
+        smallest = right;
+
+    if (smallest != i) {
+        swap(&minHeap->array[i], &minHeap->array[smallest]);
+        heapify(minHeap, smallest);
+    }
+}
+void insert(struct MinHeap* minHeap, struct heapPair second) {
+    if (minHeap->size == minHeap->capacity) {
+        printf("Heap is full, cannot insert more elements.\n");
+        return;
+    }
+
+    int i = minHeap->size;
+    minHeap->array[i] = second;
+    minHeap->size++;
+
+    while (i != 0 && minHeap->array[i].first < minHeap->array[(i - 1) / 2].first) {
+        swap(&minHeap->array[i], &minHeap->array[(i - 1) / 2]);
+        i = (i - 1) / 2;
+    }
+}
+struct heapPair extractMin(struct MinHeap* minHeap) {
+    char str[] = "Hello, world!";
+    struct heapPair minheapPair = { -1, str }; // Default second for empty heap
+
+    if (minHeap->size <= 0)
+        return minheapPair;
+
+    if (minHeap->size == 1) {
+        minHeap->size--;
+        return minHeap->array[0];
+    }
+
+    minheapPair = minHeap->array[0];
+    minHeap->array[0] = minHeap->array[minHeap->size - 1];
+    minHeap->size--;
+    heapify(minHeap, 0);
+
+    return minheapPair;
+}
+int empty(struct MinHeap* minHeap){
+    if(minHeap->size==0){
+        return 1;
+    }
+    return 0;
+}
+
 
 typedef struct Process {
     char* pid;
@@ -32,8 +154,12 @@ int startTimeComparator(const void *a, const void *b) {
     } else if (processA->startTime > processB->startTime) {
         return 1;
     }
-    return 0;
+    else{
+        int a = strcmp(processA->pid, processB->pid);
+        return a < 0 ? -1 : 1;
+    }
 }
+
 double durationComparator(const void *a, const void *b) {
     struct Process *p1 = *(struct Process **)a;
     struct Process *p2 = *(struct Process **)b;
@@ -53,49 +179,47 @@ double resptimeq(queuePair currproc , struct Process *vp, int n){
     }
 }
 
-double generateExponential(double lambda) {
-    double u = (double)rand() / RAND_MAX; 
-    return -log(1 - u) / lambda;
-}
-
 //........................................................................................................................................
 
-Output fcfs(struct Process *vp, int n) {
-    Output output;
-    output.schedule = NULL;
+void fcfs(FILE *outputFile, struct Process *vp, int n) {
+    fprintf(outputFile,"FCFS: \n");
+    if (outputFile == NULL) {
+        perror("Error opening the file");
+        return;
+    }
     qsort(vp, n, sizeof(struct Process), startTimeComparator);
     double totalTurnaroundTime = 0.0;
     double totalResponseTime = 0.0;
     double currTime = 0.0;
-    output.size = 0;
     for (int i = 0; i < n; i++) {
-        output.size++;
-        output.schedule = (Process* )realloc(output.schedule, output.size*(sizeof(Process)));
         currTime = max(currTime, vp[i].startTime);
         double endTime = currTime + vp[i].completionTime;
-        output.schedule[i].pid = vp[i].pid;
-        output.schedule[i].startTime = currTime;
-        output.schedule[i].completionTime = endTime;
+        fprintf(outputFile,"%s %.6f %.6f ",vp[i].pid, currTime, endTime);
         totalTurnaroundTime += endTime - vp[i].startTime;
         totalResponseTime += currTime - vp[i].startTime;
         currTime = endTime;
     }
-    output.avgTurnaroundTime = totalTurnaroundTime / n;
-    output.avgResponseTime = totalResponseTime / n;
-    return output;
+    totalTurnaroundTime = totalTurnaroundTime / n;
+    totalResponseTime = totalResponseTime / n;
+    fprintf(outputFile,"\n");
+    fprintf(outputFile,"%.6f %.6f ",totalTurnaroundTime ,totalResponseTime);
+    fprintf(outputFile,"\n");
+    return;
 }
 
 //........................................................................................................................................
 
-Output sjf(struct Process *vp, int n) {
-    Output output;
-    output.schedule = NULL;
+void sjf(FILE *outputFile, struct Process *vp, int n) {
+    if (outputFile == NULL) {
+        perror("Error opening the file");
+        return;
+    }
+    fprintf(outputFile,"SJF: \n");
     qsort(vp, n, sizeof(struct Process), startTimeComparator);
     double totalTurnaroundTime = 0.0;
     double totalResponseTime = 0.0;
     int i=0;
     double currTime = 0.0;
-    output.size = 0;
     struct MinHeap* minHeap = createMinHeap(n);
     while(i<n || minHeap->size > 0){
         if(minHeap->size == 0) currTime = max(currTime, vp[i].startTime);
@@ -109,29 +233,36 @@ Output sjf(struct Process *vp, int n) {
             else break;
         }
         heapPair currProc = extractMin(minHeap);
-        output.size++;
-        output.schedule = (Process* )realloc(output.schedule, output.size*(sizeof(Process)));
-        output.schedule[output.size-1].pid = currProc.pid;
-        output.schedule[output.size-1].startTime = currTime;
-        output.schedule[output.size-1].completionTime = currTime + currProc.first;
+        fprintf(outputFile,"%s %.6f %.6f ",currProc.pid, currTime, currTime + currProc.first);
         totalTurnaroundTime += currTime + currProc.first;
         totalResponseTime += currTime;
         currTime += currProc.first;
 
     }
-    output.avgTurnaroundTime = totalTurnaroundTime / n;
-    output.avgResponseTime = totalResponseTime / n;
-    return output;
+    totalTurnaroundTime = totalTurnaroundTime / n;
+    totalResponseTime = totalResponseTime / n;
+    fprintf(outputFile,"\n");
+    fprintf(outputFile,"%.6f %.6f ",totalTurnaroundTime ,totalResponseTime);
+    fprintf(outputFile,"\n");
+    return;
 }
 //........................................................................................................................................
 
 
-Output srtf(struct Process *vp, int n) {
-    Output output;
-    output.schedule = NULL;
-    output.size = 0;
+void srtf(FILE *outputFile, struct Process *vp, int n) {
+    if (outputFile == NULL) {
+        perror("Error opening the file");
+        return;
+    }
+    fprintf(outputFile,"SRTF: \n");
+    //Process* prevProc = (Process* )malloc(sizeof(Process ));
+    Process* prevProc = (Process*)malloc(sizeof(Process));
+    prevProc->pid = (char*)malloc(10*sizeof(char));
+    prevProc->pid = "hello";
+    printf("%s\n", prevProc->pid);
     double totalTurnaroundTime = 0.0;
     double totalResponseTime = 0.0;
+    for(int i=0;i<n;i++){totalTurnaroundTime-=vp[i].startTime;totalResponseTime-=vp[i].startTime;}
     qsort(vp, n, sizeof(struct Process), startTimeComparator);
     int i=0;
     double currTime = 0.0;
@@ -140,8 +271,6 @@ Output srtf(struct Process *vp, int n) {
     while(i<n){
         currTime = vp[i].startTime;
         while(i<n && vp[i].startTime == currTime){
-            totalTurnaroundTime-=vp[i].startTime;
-            totalResponseTime-=vp[i].startTime;
             heapPair temp = { vp[i].completionTime, vp[i].pid };
             insert(minHeap, temp);
             i++;
@@ -151,8 +280,6 @@ Output srtf(struct Process *vp, int n) {
             heapPair currProc = extractMin(minHeap);
             double tmp = resptime(currProc, vp, n);
             if(tmp==currProc.first){totalResponseTime+=currTime;}
-            output.size++;
-            output.schedule = (Process* )realloc(output.schedule, output.size*(sizeof(Process)));
             double remaining = currProc.first;
             double prevTime;
             if(nextTime - currTime < remaining){
@@ -167,32 +294,54 @@ Output srtf(struct Process *vp, int n) {
                 currProc.first = 0;
                 totalTurnaroundTime+=currTime;
             }
-            output.schedule[output.size-1].pid = currProc.pid;
-            output.schedule[output.size-1].startTime = prevTime;
-            output.schedule[output.size-1].completionTime = currTime;
+            if(prevProc->pid == "hello"){
+                prevProc->pid = currProc.pid;
+                prevProc->startTime = prevTime;
+                prevProc->completionTime = currTime;
+            }
+            else if(currProc.pid == prevProc->pid){
+                prevProc->completionTime = currTime;
+            }
+            else{
+                fprintf(outputFile,"%s %.6f %.6f ", prevProc->pid, prevProc->startTime, prevProc->completionTime);
+                prevProc->pid = currProc.pid;
+                prevProc->startTime = prevTime;
+                prevProc->completionTime = currTime;
+            }
+            if(minHeap->size == 0){
+                    fprintf(outputFile,"%s %.6f %.6f ",prevProc->pid, prevProc->startTime, prevProc->completionTime);                 
+            }
         }
     }
-    output.avgTurnaroundTime = totalTurnaroundTime / n;
-    output.avgResponseTime = totalResponseTime / n;
-    return output;
+    totalTurnaroundTime = totalTurnaroundTime / n;
+    totalResponseTime = totalResponseTime / n;
+    fprintf(outputFile,"\n");
+    fprintf(outputFile,"%.6f %.6f ",totalTurnaroundTime ,totalResponseTime);
+    fprintf(outputFile,"\n");
+    return;
 }
 
 //.......................................................................................................................................
 
-Output roundrobin(struct Process *vp, int n, double slice){
-    Output output;
-    output.schedule = (Process* )malloc(10000000*(sizeof(Process)));
-    output.size = 0;
+void roundrobin(FILE *outputFile, struct Process *vp, int n, double slice) {
+    if (outputFile == NULL) {
+        perror("Error opening the file");
+        return;
+    }
+    fprintf(outputFile,"RR: \n");
+    Process* prevProc = (Process* )malloc(sizeof(Process ));
+    prevProc->pid = (char*)malloc(10*sizeof(char));
+    prevProc->pid = "hello";
     double totalTurnaroundTime = 0.0;
     double totalResponseTime = 0.0;
+    for(int i=0;i<n;i++){totalTurnaroundTime-=vp[i].startTime;totalResponseTime-=vp[i].startTime;}
     qsort(vp, n, sizeof(struct Process), startTimeComparator);
-    int i=0,j=0;
+    int i=0;
     double currTime = 0.0;
     int completed = 0;
     struct Queue* q = createQueue();
     while(completed != n){
         while(i<n && vp[i].startTime <= currTime){
-            totalResponseTime-=vp[i].startTime; totalTurnaroundTime-=vp[i].startTime;
             queuePair temp = {vp[i].completionTime, vp[i].pid};
             enqueue(q, temp);
             i++;
@@ -217,79 +366,341 @@ Output roundrobin(struct Process *vp, int n, double slice){
                 totalTurnaroundTime+=currTime;
                 completed++;
             }
-            output.size++;
-            output.schedule[output.size-1].pid = (char*)malloc(10*sizeof(char));
-            output.schedule[output.size-1].pid = temp.pid;
-            output.schedule[output.size-1].startTime = prevTime;
-            output.schedule[output.size-1].completionTime = currTime;
+            if(prevProc->pid == "hello"){
+                prevProc->pid = temp.pid;
+                prevProc->startTime = prevTime;
+                prevProc->completionTime = currTime;
+            }
+            else if(temp.pid == prevProc->pid){
+                prevProc->completionTime = currTime;
+            }
+            else{
+                fprintf(outputFile,"%s %.6f %.6f ", prevProc->pid, prevProc->startTime, prevProc->completionTime);
+                prevProc->pid = temp.pid;
+                prevProc->startTime = prevTime;
+                prevProc->completionTime = currTime;
+            }
+            if(q->size == 0){
+                fprintf(outputFile,"%s %.6f %.6f ",prevProc->pid, prevProc->startTime, prevProc->completionTime);                 
+            }
         }
         else{
             currTime = vp[i].startTime;
         }
-        j++;
     }
-    output.avgTurnaroundTime = totalTurnaroundTime / n;
-    output.avgResponseTime = totalResponseTime / n;
-    return output;
+    totalTurnaroundTime = totalTurnaroundTime / n;
+    totalResponseTime = totalResponseTime / n;
+    fprintf(outputFile,"\n");
+    fprintf(outputFile,"%.6f %.6f ",totalTurnaroundTime ,totalResponseTime);
+    fprintf(outputFile,"\n");
+    return;
 }
 
-//........................................................................................................................................
+void Qboost (struct Queue* q1, struct Queue* q2, struct Queue* q3, double *boostTime, double boost){
+    while(q2->size > 0){
+        queuePair temp = dequeue(q2);
+        enqueue(q1, temp);
+    }
+    while(q3->size > 0){
+        queuePair temp = dequeue(q3);
+        enqueue(q1, temp);
+    }
+    *boostTime += boost;
+    return;
+}
 
+void mlfq(FILE *outputFile, struct Process *vp, int n, double slice1, double slice2, double slice3, double boost) {
+    if (outputFile == NULL) {
+        perror("Error opening the file");
+        return;
+    }
+    fprintf(outputFile,"MLFQ: \n");
+
+    Process* prevProc = (Process* )malloc(sizeof(Process ));
+    prevProc->pid = (char*)malloc(10*sizeof(char));
+    prevProc->pid = "hello";
+    qsort(vp, n, sizeof(struct Process), startTimeComparator);
+
+    int i=0;
+    double currTime = 0.0, nextTime = 0, prevTime = 0;
+    double boost_var = 0;
+    double* boostTime = &boost_var;
+    *boostTime = boost;
+
+    struct Queue* q1 = createQueue();
+    struct Queue* q2 = createQueue();
+    struct Queue* q3 = createQueue();
+
+    while(i<n || q1->size > 0 || q2->size > 0 || q3->size > 0){
+        if(q1->size == 0 && q2->size == 0 && q3->size == 0){
+            currTime = max(currTime, vp[i].startTime);
+            while(i<n && vp[i].startTime <= currTime){
+                queuePair temp = {vp[i].completionTime, vp[i].pid};
+                enqueue(q1, temp);
+                i++;
+            }
+        }
+        if(currTime >= *boostTime){
+            Qboost(q1, q2, q3, boostTime, boost);
+        }
+        while(q1->size > 0){
+            queuePair qp = dequeue(q1);
+            int rem = qp.first;
+            printf("\n%.6f", rem);
+            prevTime = currTime;   // this is what our time is right now. 
+            if(rem > slice1){       
+                nextTime = prevTime + slice1; 
+                for(;i<n && vp[i].startTime <= nextTime;i++){
+                    queuePair temp = {vp[i].completionTime, vp[i].pid};
+                    enqueue(q1, temp);
+                } 
+                currTime = nextTime;                
+                if(prevProc->pid == "hello"){
+                    prevProc->pid = qp.pid;
+                    prevProc->startTime = prevTime;
+                    prevProc->completionTime = currTime;
+                }
+                else if(qp.pid == prevProc->pid){
+                    prevProc->completionTime = currTime;
+                }
+                else{
+                    fprintf(outputFile,"%s %.6f %.6f ", prevProc->pid, prevProc->startTime, prevProc->completionTime);
+                    prevProc->pid = qp.pid;
+                    prevProc->startTime = prevTime;
+                    prevProc->completionTime = currTime;
+                }
+                if(q1->size == 0){
+                    fprintf(outputFile,"%s %.6f %.6f ",prevProc->pid, prevProc->startTime, prevProc->completionTime);                 
+                }
+                qp.first = (rem-slice1);
+                enqueue(q2, qp);
+            }
+            else{
+                nextTime = prevTime + rem;
+                for(;i<n && vp[i].startTime <= nextTime;i++){
+                    queuePair temp = {vp[i].completionTime, vp[i].pid};
+                    enqueue(q1, temp);
+                } 
+                currTime = nextTime;                
+                if(prevProc->pid == "hello"){
+                    prevProc->pid = qp.pid;
+                    prevProc->startTime = prevTime;
+                    prevProc->completionTime = currTime;
+                }
+                else if(qp.pid == prevProc->pid){
+                    prevProc->completionTime = currTime;
+                }
+                else{
+                    fprintf(outputFile,"%s %.6f %.6f ", prevProc->pid, prevProc->startTime, prevProc->completionTime);
+                    prevProc->pid = qp.pid;
+                    prevProc->startTime = prevTime;
+                    prevProc->completionTime = currTime;
+                }
+                if(q1->size == 0){
+                    fprintf(outputFile,"%s %.6f %.6f ",prevProc->pid, prevProc->startTime, prevProc->completionTime);                 
+                }
+            }
+            if(currTime >= *boostTime) Qboost(q1, q2, q3, boostTime, boost);
+
+        }
+
+        if(currTime >= *boostTime) Qboost(q1, q2, q3, boostTime, boost);
+
+        while (q2->size > 0 && q1->size == 0) {
+            queuePair qp = dequeue(q2);
+            int rem = qp.first;
+            prevTime = currTime;   // this is what our time is right now. 
+            if(rem > slice2){       
+                nextTime = prevTime + slice2; 
+                for(;i<n && vp[i].startTime <= nextTime;i++){
+                    queuePair temp = {vp[i].completionTime, vp[i].pid};
+                    enqueue(q1, temp);
+                } 
+                currTime = nextTime;                
+                if(prevProc->pid == "hello"){
+                    prevProc->pid = qp.pid;
+                    prevProc->startTime = prevTime;
+                    prevProc->completionTime = currTime;
+                }
+                else if(qp.pid == prevProc->pid){
+                    prevProc->completionTime = currTime;
+                }
+                else{
+                    fprintf(outputFile,"%s %.6f %.6f ", prevProc->pid, prevProc->startTime, prevProc->completionTime);
+                    prevProc->pid = qp.pid;
+                    prevProc->startTime = prevTime;
+                    prevProc->completionTime = currTime;
+                }
+                if(q2->size == 0){
+                    fprintf(outputFile,"%s %.6f %.6f ",prevProc->pid, prevProc->startTime, prevProc->completionTime);                 
+                }
+                qp.first = (rem-slice2);
+                enqueue(q3, qp);
+            }
+            else{
+                nextTime = prevTime + rem;
+                for(;i<n && vp[i].startTime <= nextTime;i++){
+                    queuePair temp = {vp[i].completionTime, vp[i].pid};
+                    enqueue(q1, temp);
+                } 
+                currTime = nextTime;                
+                if(prevProc->pid == "hello"){
+                    prevProc->pid = qp.pid;
+                    prevProc->startTime = prevTime;
+                    prevProc->completionTime = currTime;
+                }
+                else if(qp.pid == prevProc->pid){
+                    prevProc->completionTime = currTime;
+                }
+                else{
+                    fprintf(outputFile,"%s %.6f %.6f ", prevProc->pid, prevProc->startTime, prevProc->completionTime);
+                    prevProc->pid = qp.pid;
+                    prevProc->startTime = prevTime;
+                    prevProc->completionTime = currTime;
+                }
+                if(q2->size == 0){
+                    fprintf(outputFile,"%s %.6f %.6f ",prevProc->pid, prevProc->startTime, prevProc->completionTime);                 
+                }
+            }
+            if(currTime >= *boostTime) Qboost(q1, q2, q3, boostTime, boost);
+        }
+
+        while (q3->size > 0 && q2->size == 0 && q1->size == 0) {
+            queuePair qp = dequeue(q3);
+            int rem = qp.first;
+            prevTime = currTime;   // this is what our time is right now. 
+            if(rem > slice3){       
+                nextTime = prevTime + slice3; 
+                for(;i<n && vp[i].startTime <= nextTime;i++){
+                    queuePair temp = {vp[i].completionTime, vp[i].pid};
+                    enqueue(q1, temp);
+                } 
+                currTime = nextTime;                
+                if(prevProc->pid == "hello"){
+                    prevProc->pid = qp.pid;
+                    prevProc->startTime = prevTime;
+                    prevProc->completionTime = currTime;
+                }
+                else if(qp.pid == prevProc->pid){
+                    prevProc->completionTime = currTime;
+                }
+                else{
+                    fprintf(outputFile,"%s %.6f %.6f ", prevProc->pid, prevProc->startTime, prevProc->completionTime);
+                    prevProc->pid = qp.pid;
+                    prevProc->startTime = prevTime;
+                    prevProc->completionTime = currTime;
+                }
+                if(q3->size == 0){
+                    fprintf(outputFile,"%s %.6f %.6f ",prevProc->pid, prevProc->startTime, prevProc->completionTime);                 
+                }
+                qp.first = (rem-slice3);
+                enqueue(q3, qp);
+            }
+            else{
+                nextTime = prevTime + rem;
+                for(;i<n && vp[i].startTime <= nextTime;i++){
+                    queuePair temp = {vp[i].completionTime, vp[i].pid};
+                    enqueue(q1, temp);
+                } 
+                currTime = nextTime;                
+                if(prevProc->pid == "hello"){
+                    prevProc->pid = qp.pid;
+                    prevProc->startTime = prevTime;
+                    prevProc->completionTime = currTime;
+                }
+                else if(qp.pid == prevProc->pid){
+                    prevProc->completionTime = currTime;
+                }
+                else{
+                    fprintf(outputFile,"%s %.6f %.6f ", prevProc->pid, prevProc->startTime, prevProc->completionTime);
+                    prevProc->pid = qp.pid;
+                    prevProc->startTime = prevTime;
+                    prevProc->completionTime = currTime;
+                }
+                if(q3->size == 0){
+                    fprintf(outputFile,"%s %.6f %.6f ",prevProc->pid, prevProc->startTime, prevProc->completionTime);                 
+                }
+            }
+            if(currTime >= *boostTime) Qboost(q1, q2, q3, boostTime, boost);
+        }
+
+        
+    }
+    // output.avgTurnaroundTime = totalTurnaroundTime / n;
+    // output.avgResponseTime = totalResponseTime / n;
+    return;
+}
 
 int main(int argc, char *argv[]) {
-    if (argc < 7) {
-        printf("Usage: %s output_file num1 num2 num3 num4 num5\n", argv[0]);
+    if (argc < 8) {
+        printf("Usage: %s input_file output_file num1 num2 num3 num4 num5\n", argv[0]);
         return 1;
     }
-    char *outputFileName = argv[1];
-    double nums[5];
-    for (int i = 0; i < 5; i++) {
-        nums[i] = atof(argv[i + 2]);
-    }
-    int n=5,i=0;
-    // struct Process *processes = NULL;
-    struct Process* processes = (Process* )malloc(1000000*(sizeof(Process)));
-    int numEntries = 0;
-    while(i<=n){
-        // processes = realloc(processes, (numEntries+1) * sizeof(struct Process));
-        processes[numEntries].pid = (char*)malloc(10*sizeof(char));
-        sprintf(processes[numEntries].pid, "j%d",i);
-        processes[numEntries].startTime = generateExponential(0.06);
-        processes[numEntries].completionTime = generateExponential(0.06);
-        i++; numEntries++;
-    }
-    Output outf = fcfs(processes, numEntries);
-    Output outrr = roundrobin(processes, numEntries,nums[0]);
-    Output outsjf = sjf(processes, numEntries);
-    Output outsrtf = srtf(processes, numEntries);
-    // Output outmlfq = mlfq(processes, numEntries,nums[1],nums[2],nums[3],nums[4]);
 
-    FILE *outputFile = fopen(outputFileName, "w");
+    char *inputFileName = argv[1];
+    char *outputFileName = argv[2];
+    double nums[5];
+
+    for (int i = 0; i < 5; i++) {
+        nums[i] = atof(argv[i + 3]);
+    }
+
+    FILE *inputFile = fopen(inputFileName, "r");
+    if (!inputFile) {
+        printf("Error opening files.\n");
+        return 1;
+    }
+    struct Process *processes = NULL;
+    int numEntries = 0;
+    while (1) {
+        processes = realloc(processes, (numEntries + 1) * sizeof(struct Process));
+        if (!processes) {
+            printf("Memory allocation error.\n");
+            fclose(inputFile);
+            return 1;
+        }
+        processes[numEntries].pid = (char*)malloc(10*sizeof(char));
+        if (fscanf(inputFile, "%s %lf %lf", processes[numEntries].pid, &processes[numEntries].startTime, &processes[numEntries].completionTime) != 3) {
+            break;
+        }
+        numEntries++;
+    }
+    printf("%d",numEntries);
+    FILE *outputFile = fopen(argv[2], "w");
     if (!outputFile) {
         printf("Error opening output file.\n");
         free(processes);
         return 1;
     }
-    for(int i=0;i<outf.size;i++){
-        fprintf(outputFile,"%s %.6f %.6f\n", outf.schedule[i].pid, outf.schedule[i].startTime, outf.schedule[i].completionTime);
-    }fprintf(outputFile,"%0.6f %.6f\n", outf.avgTurnaroundTime, outf.avgResponseTime);
+    fcfs(outputFile, processes, numEntries);
+    roundrobin(outputFile, processes, numEntries, nums[0]);
+    sjf(outputFile, processes, numEntries);
+    srtf(outputFile, processes, numEntries);
+    mlfq(outputFile, processes, numEntries, 5, 3, 2, 8);
 
-    for(int i=0;i<outrr.size;i++){
-        fprintf(outputFile,"%s %.6f %.6f\n", outrr.schedule[i].pid, outrr.schedule[i].startTime, outrr.schedule[i].completionTime);
-    }fprintf(outputFile,"%0.6f %.6f\n", outrr.avgTurnaroundTime, outrr.avgResponseTime);
 
-    for(int i=0;i<outsjf.size;i++){
-        fprintf(outputFile,"%s %.6f %.6f\n", outsjf.schedule[i].pid, outsjf.schedule[i].startTime, outsjf.schedule[i].completionTime);
-    }fprintf(outputFile,"%0.6f %.6f\n", outsjf.avgTurnaroundTime, outsjf.avgResponseTime);
+    // Output outrr = roundrobin(processes, numEntries,nums[0]);
+    // Output outsjf = sjf(processes, numEntries);
+    // Output outsrtf = srtf(processes, numEntries);
+    // Output outmlfq = mlfq(processes, numEntries,nums[1],nums[2],nums[3],nums[4]);
 
-    for(int i=0;i<outsrtf.size;i++){
-        fprintf(outputFile,"%s %.6f %.6f\n", outsrtf.schedule[i].pid, outsrtf.schedule[i].startTime, outsrtf.schedule[i].completionTime);
-    }fprintf(outputFile,"%0.6f %.6f\n", outsrtf.avgTurnaroundTime, outsrtf.avgResponseTime);
+    // for(int i=0;i<outf.size;i++){
+    //     fprintf(outputFile,"%s %.6f %.6f ", outf.schedule[i].pid, outf.schedule[i].startTime, outf.schedule[i].completionTime);
+    // }fprintf(outputFile,"\n%0.6f %.6f\n", outf.avgTurnaroundTime, outf.avgResponseTime);
 
-    // for(int i=0;i<outmlfq.size;i++){
-    //     fprintf("%s %.6f %.6f ", outmlfq.schedule[i].pid, outmlfq.schedule[i].startTime, outmlfq.schedule[i].completionTime);
-    // }
-    // fprintf("%0.6f %.6f\n", outmlfq.avgTurnaroundTime, outmlfq.avgResponseTime);
+    // for(int i=0;i<outrr.size;i++){
+    //     fprintf(outputFile,"%s %.6f %.6f ", outrr.schedule[i].pid, outrr.schedule[i].startTime, outrr.schedule[i].completionTime);
+    // }fprintf(outputFile,"\n%0.6f %.6f\n", outrr.avgTurnaroundTime, outrr.avgResponseTime);
+
+    // for(int i=0;i<outsjf.size;i++){
+    //     fprintf(outputFile,"%s %.6f %.6f ", outsjf.schedule[i].pid, outsjf.schedule[i].startTime, outsjf.schedule[i].completionTime);
+    // }fprintf(outputFile,"\n%0.6f %.6f\n", outsjf.avgTurnaroundTime, outsjf.avgResponseTime);
+
+    // for(int i=0;i<outsrtf.size;i++){
+    //     fprintf(outputFile,"%s %.6f %.6f ", outsrtf.schedule[i].pid, outsrtf.schedule[i].startTime, outsrtf.schedule[i].completionTime);
+    // }fprintf(outputFile,"\n%0.6f %.6f\n", outsrtf.avgTurnaroundTime, outsrtf.avgResponseTime);
+
+    fclose(inputFile);
     fclose(outputFile);
     free(processes);
     printf("Process data and process array written to %s\n", outputFileName);
