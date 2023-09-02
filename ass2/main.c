@@ -249,6 +249,31 @@ Output roundrobin(struct Process *vp, int n, double slice) {
     return output;
 }
 
+Output mlfq(struct Process *vp, int n, double slice1, double slice2, double slice3, double boost) {
+    Output output;
+    output.schedule = NULL;
+    output.size = 0;
+
+    qsort(vp, n, sizeof(struct Process), startTimeComparator);
+
+    int i=0;
+    double currTime = 0.0;
+    int completed = 0;
+
+    struct Queue* q1 = createQueue();
+    struct Queue* q2 = createQueue();
+    struct Queue* q3 = createQueue();
+ 
+    while(completed != n){
+        
+    }
+    // output.avgTurnaroundTime = totalTurnaroundTime / n;
+    // output.avgResponseTime = totalResponseTime / n;
+    
+    return output;
+}
+
+
 //.......................................................................................................................................
 
 int main(int argc, char *argv[]) {

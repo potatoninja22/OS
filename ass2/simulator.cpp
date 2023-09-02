@@ -175,6 +175,186 @@ vector<pair<string, pair<int, int>>> roundrobin(vector<Process* > vp, int slice)
 
 }
 
+void Qboost (queue<Process* > &q1, queue<Process* > &q2, queue<Process* > &q3, int* boostTime, int boost){
+    q1.insert(q1.end(), q2.begin(), q2.end());
+    q2.clear();
+    q1.insert(q1.end(), q3.begin(), q3.end());
+    q3.clear();
+    boostTime += boost;
+}
+
+vector<pair<string, pair<int, int>>> MLFQ(vector<Process* > vp, int slice1, int slice2, int slice3, int boost) {
+    vector<pair<string, pair<int,int>>> schedule;
+    map<int, int> sl2;
+    map<int, int> sl3;
+    queue<Process* > q1, q2, q3;
+    int i = 0, currTime = 0, nextTime = 0, prevTime = 0;
+    int boostTime = boost;
+    while (i < n || !q1.empty() || !q2.empty() || !q3.empty()) {
+        if (q1.empty() && q2.empty() && q3.empty()) {
+            currTime = max(currTime, vp[i]->getStartTime());           // since all the queues are empty there is nothing to boost, hence we dont need to check for boostTime
+            while(i<n && vp[i]->getStartTime() <= currTime)
+            q1.push_back(vp[i++]);
+        }
+        if (currTime == boostTime) {
+            Qboost(q1, q2, q3, boostTime, boost);
+        }
+        while (!q1.empty()) {
+            auto p = q1.front();
+            q1.pop();
+            int rem = p->getCompletionTime();
+            prevTime = currTime;   // this is what our time is right now. 
+            if(rem > slice1){          // if rem is greater than slice1, we will check for new arrivals and boosts between prevTime and prevTime + slice1. After this our current job will get finished and we will push it to queue2
+                nexTime = prevTime + slice1;   // take into account whatever happens between prevTime and nexTime (arrival + boost)
+                while(boostTime >= prevTime && boostTime <= nextTime){
+                    for(;i<n && vp[i]->getStartTime()<=boostTime;i++){
+                        q1.push(vp[i]);
+                    }
+                    currTime = boostTime;
+                    Qboost(q1, q2, q3, boostTime, boost);
+                }
+
+                for(;i<n && vp[i]->getStartTime()<=nextTime && vp[i]->getStartTime() >= currTime;i++){
+                    q1.push(vp[i]);
+                }
+
+                // now everything that was supposed to happen in the intermediate time interval has happened, and I can set currTime to nextTime
+                // I will also push the process to Q2 since it did not get completed within the time slice
+                currTime = nextTime;
+                schedule.push_back({p->getPid(), {prevTime, currTime}});
+                p->setCompletionTime(rem-slice1);
+                q2.push(p);
+            }
+            else{
+                nextTime = prevTime + rem;
+                while(boostTime >= prevTime && boostTime <= nextTime){
+                    for(;i<n && vp[i]->getStartTime()<=boostTime;i++){
+                        q1.push(vp[i]);
+                    }
+                    currTime = boostTime;
+                    Qboost(q1, q2, q3, boostTime, boost);
+                }
+
+                for(;i<n && vp[i]->getStartTime()<=nextTime && vp[i]->getStartTime() >= currTime;i++){
+                    q1.push(vp[i]);
+                }
+
+                // now everything that was supposed to happen in the intermediate time interval has happened, and I can set currTime to nextTime
+                // the process p is complete, so no need to push to q2
+                currTime = nextTime;
+                schedule.push_back({p->getPid(), {prevTime, currTime}});
+
+            }
+
+        // now we come to the time when q1 has become empty and q2 is non empty. We will consider time slice2; First process in q2 will run from 
+
+        while (!q2.empty() && q1.empty()) {
+            Process p = q2.front();
+            q2.pop_front();
+            if (sl2.find(p.pid) == sl2.end()) {
+                sl2[p.pid] = slice2;
+            }
+            time = std::max(time, p.start_time);
+
+            if (i < processes.size() && processes[i].start_time < time + std::min(p.remaining_time, sl2[p.pid])) {
+                q1.push_back(processes[i++]);
+            }
+
+            if (q1.empty()) {
+                if (time + std::min(sl2[p.pid], p.remaining_time) > boost) {
+                    schedule[p.pid].push_back({time, boost});
+                    q2.push_front({p.pid, boost, time + p.remaining_time - boost, 0});
+                    q1.insert(q1.end(), q2.begin(), q2.end());
+                    q2.clear();
+                    q1.insert(q1.end(), q3.begin(), q3.end());
+                    q3.clear();
+                    sl2.clear();
+                    time = boost;
+                    boost += boost;
+                } else {
+                    schedule[p.pid].push_back({time, time + std::min(sl2[p.pid], p.remaining_time)});
+                    if (p.remaining_time > sl2[p.pid]) {
+                        q3.push_back({p.pid, time, p.remaining_time - sl2[p.pid], 0});
+                    }
+                    sl2.erase(p.pid);
+                }
+            } else {
+                Process t = q1.front();
+                if (boost < t.start_time) {
+                    schedule[p.pid].push_back({time, boost});
+                    q2.push_front({p.pid, boost, time + p.remaining_time - boost, 0});
+                    q2.insert(q2.end(), q3.begin(), q3.end());
+                    q3.clear();
+                    q2.insert(q2.end(), q1.begin(), q1.end());
+                    q1.clear();
+                    q1.insert(q1.end(), q2.begin(), q2.end());
+                    q2.clear();
+                    sl2.clear();
+                    time = boost;
+                    boost += boost;
+                } else {
+                    schedule[p.pid].push_back({time, t.start_time});
+                    q2.push_front({p.pid, t.start_time, time + p.remaining_time - t.start_time, 0});
+                    sl2[p.pid] -= t.start_time - time;
+                }
+            }
+        }
+
+        while (!q3.empty() && q1.empty() && q2.empty()) {
+            Process p = q3.front();
+            q3.pop_front();
+            if (sl3.find(p.pid) == sl3.end()) {
+                sl3[p.pid] = slice3;
+            }
+            time = std::max(time, p.start_time);
+
+            if (i < processes.size() && processes[i].start_time <= time + std::min(sl3[p.pid], p.remaining_time)) {
+                q1.push_back(processes[i++]);
+            }
+
+            if (q1.empty()) {
+                if (time + std::min(sl3[p.pid], p.remaining_time) > boost) {
+                    schedule[p.pid].push_back({time, boost});
+                    q3.push_front({p.pid, boost, time + p.remaining_time - boost, 0});
+                    q1.insert(q1.end(), q2.begin(), q2.end());
+                    q2.clear();
+                    q1.insert(q1.end(), q3.begin(), q3.end());
+                    q3.clear();
+                    sl3.clear();
+                    time = boost;
+                    boost += boost;
+                } else {
+                    schedule[p.pid].push_back({time, time + std::min(sl3[p.pid], p.remaining_time)});
+                    if (p.remaining_time > sl3[p.pid]) {
+                        q3.push_back({p.pid, time, p.remaining_time - sl3[p.pid], 0});
+                    }
+                    sl3.erase(p.pid);
+                }
+            } else {
+                Process t = q1.front();
+                if (boost < t.start_time) {
+                    schedule[p.pid].push_back({time, boost});
+                    q3.push_front({p.pid, boost, time + p.remaining_time - boost, 0});
+                    q2.insert(q2.end(), q3.begin(), q3.end());
+                    q3.clear();
+                    q2.insert(q2.end(), q1.begin(), q1.end());
+                    q1.clear();
+                    q1.insert(q1.end(), q2.begin(), q2.end());
+                    q2.clear();
+                    sl3.clear();
+                    time = boost;
+                    boost += boost;
+                } else {
+                    schedule[p.pid].push_back({time, t.start_time});
+                    q3.push_front({p.pid, t.start_time, time + p.remaining_time - t.start_time, 0});
+                    sl3[p.pid] += time - t.start_time;
+                }
+            }
+        }
+    }
+    return schedule;
+}
+
 int main(){
     // int n = argv[1]  // number of processes
     // int lamda = argv[2];  // inter-arrival time parameter
