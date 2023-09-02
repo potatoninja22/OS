@@ -441,7 +441,7 @@ int main(int argc, char *argv[]) {
         printf("%s %0.6f %0.f\n",processes[i].pid,processes[i].startTime,processes[i].completionTime);
     }
     printf("hello1");
-    Output outfcfs = mlfq(processes, numEntries, 2, 5, 10, 20);
+    Output outfcfs = mlfq(processes, numEntries, 5, 3, 2, 8);
     int n = outfcfs.size;
     printf("hello2");
     for(int i=0;i<n;i++){
