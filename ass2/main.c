@@ -267,6 +267,7 @@ Output mlfq(struct Process *vp, int n, double slice1, double slice2, double slic
     struct Queue* q1 = createQueue();
     struct Queue* q2 = createQueue();
     struct Queue* q3 = createQueue();
+
     while(i<n || q1->size > 0 || q2->size > 0 || q3->size > 0){
         if(q1->size == 0 && q2->size == 0 && q3->size == 0){
             currTime = max(currTime, vp[i].startTime);
@@ -283,7 +284,7 @@ Output mlfq(struct Process *vp, int n, double slice1, double slice2, double slic
 
         while(q1->size > 0){
             queuePair qp = dequeue(q1);
-            int rem = qp.first;
+            double rem = qp.first;
             prevTime = currTime;   // this is what our time is right now. 
             if(rem > slice1){       
                 nextTime = prevTime + slice1; 
@@ -441,7 +442,7 @@ int main(int argc, char *argv[]) {
         printf("%s %0.6f %0.f\n",processes[i].pid,processes[i].startTime,processes[i].completionTime);
     }
     printf("hello1");
-    Output outfcfs = mlfq(processes, numEntries, 5, 3, 2, 8);
+    Output outfcfs = mlfq(processes, numEntries, 2, 4, 6, 12);
     int n = outfcfs.size;
     printf("hello2");
     for(int i=0;i<n;i++){

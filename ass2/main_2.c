@@ -454,14 +454,11 @@ void mlfq(FILE *outputFile, struct Process *vp, int n, double slice1, double sli
     double totalTurnaroundTime = 0.0;
     double totalResponseTime = 0.0;
     for(int i=0;i<n;i++){totalTurnaroundTime-=vp[i].startTime;totalResponseTime-=vp[i].startTime;}
-    Process* prevProc = (Process* )malloc(sizeof(Process ));
-    prevProc->pid = (char*)malloc(10*sizeof(char));
-    prevProc->pid = "hello";
 
     qsort(vp, n, sizeof(struct Process), startTimeComparator);
 
-    int i=0;
-    double currTime = 0.0, nextTime = 0, prevTime = 0;
+    int i = 0;
+    double currTime = 0.0, nextTime = 0, prevTime = 0, rem=0;
     double boost_var = 0;
     double* boostTime = &boost_var;
     *boostTime = boost;
@@ -470,30 +467,36 @@ void mlfq(FILE *outputFile, struct Process *vp, int n, double slice1, double sli
     struct Queue* q2 = createQueue();
     struct Queue* q3 = createQueue();
 
+    Process* prevProc = (Process* )malloc(sizeof(Process ));
+    prevProc->pid = (char*)malloc(10*sizeof(char));
+
     while(i<n || q1->size > 0 || q2->size > 0 || q3->size > 0){
+
         if(q1->size == 0 && q2->size == 0 && q3->size == 0){
+            prevProc->pid = "hello";
             currTime = max(currTime, vp[i].startTime);
+            *boostTime = boost*(int)((currTime+boost-1)/boost);    // setting the boostTime to a value slightly greater than currTime
             while(i<n && vp[i].startTime <= currTime){
                 queuePair temp = {vp[i].completionTime, vp[i].pid};
                 enqueue(q1, temp);
                 i++;
             }
         }
+
         if(currTime >= *boostTime){
             Qboost(q1, q2, q3, boostTime, boost);
         }
+
         while(q1->size > 0){
             queuePair qp = dequeue(q1);
+            printf("%s %.3f\n", qp.pid, qp.first);
             if(resptimeq(qp,vp,n)==qp.first){totalResponseTime+=currTime;}
-            int rem = qp.first;
-            prevTime = currTime;   
-            if(rem > slice1){       
-                nextTime = prevTime + slice1; 
-                for(;i<n && vp[i].startTime <= nextTime;i++){
-                    queuePair temp = {vp[i].completionTime, vp[i].pid};
-                    enqueue(q1, temp);
-                } 
-                currTime = nextTime;                
+            rem = qp.first;
+            prevTime = currTime;
+            int flag = 0;   
+            if(rem > slice1){ 
+                printf("%s\n", qp.pid);      
+                currTime = prevTime + slice1;  
                 if(prevProc->pid == "hello"){
                     prevProc->pid = qp.pid;
                     prevProc->startTime = prevTime;
@@ -509,17 +512,15 @@ void mlfq(FILE *outputFile, struct Process *vp, int n, double slice1, double sli
                     prevProc->completionTime = currTime;
                 }
                 qp.first = (rem-slice1);
-                enqueue(q2, qp);
+                if(*boostTime >= prevTime && *boostTime <= currTime){
+                    flag = 1;
+                }
             }
             else{    // current Process has finished, so we need to print this as well
+                printf("For jobs early %s %.3f\n", qp.pid, qp.first);
                 qp.first = 0;
-                nextTime = prevTime + rem;
+                currTime = prevTime + rem;
                 totalTurnaroundTime+=nextTime;
-                for(;i<n && vp[i].startTime <= nextTime;i++){
-                    queuePair temp = {vp[i].completionTime, vp[i].pid};
-                    enqueue(q1, temp);
-                } 
-                currTime = nextTime;                
                 if(prevProc->pid == "hello"){
                     prevProc->pid = qp.pid;
                     prevProc->startTime = prevTime;
@@ -539,7 +540,25 @@ void mlfq(FILE *outputFile, struct Process *vp, int n, double slice1, double sli
                     prevProc->pid = "hello";                
                 }
             }
+            for(;i<n && vp[i].startTime <= *boostTime && vp[i].startTime <= currTime; i++){
+                queuePair temp = {vp[i].completionTime, vp[i].pid};
+                enqueue(q1, temp);
+            }
+            double temp = *boostTime;
             if(currTime >= *boostTime) Qboost(q1, q2, q3, boostTime, boost);
+            
+            for(;i<n && vp[i].startTime > temp && vp[i].startTime <= currTime; i++){
+                queuePair temp = {vp[i].completionTime, vp[i].pid};
+                enqueue(q1, temp);
+            }
+
+            // if a boost has occured while the process (with duration greater than time slice) has been running, 
+            // we enqueue it to q1 after its completion. else we enqueue it to q2 
+            if(flag){
+                enqueue(q1, qp);
+            } else if(!flag && qp.first > 0){
+                enqueue(q2, qp);
+            }
 
         }
 
@@ -548,14 +567,11 @@ void mlfq(FILE *outputFile, struct Process *vp, int n, double slice1, double sli
         while (q2->size > 0 && q1->size == 0) {
             queuePair qp = dequeue(q2);
             if(resptimeq(qp,vp,n)==qp.first){totalResponseTime+=currTime;}
-            int rem = qp.first;
+            rem = qp.first;
             prevTime = currTime;   // this is what our time is right now. 
+            int flag = 0;
             if(rem > slice2){       
                 nextTime = prevTime + slice2; 
-                for(;i<n && vp[i].startTime <= nextTime;i++){
-                    queuePair temp = {vp[i].completionTime, vp[i].pid};
-                    enqueue(q1, temp);
-                } 
                 currTime = nextTime;                
                 if(prevProc->pid == "hello"){
                     prevProc->pid = qp.pid;
@@ -572,16 +588,14 @@ void mlfq(FILE *outputFile, struct Process *vp, int n, double slice1, double sli
                     prevProc->completionTime = currTime;
                 }
                 qp.first = (rem-slice2);
-                enqueue(q3, qp);
+                if(*boostTime >= prevTime && *boostTime <= currTime){
+                    flag = 1;
+                }
             }
             else{
                 qp.first = 0;
                 nextTime = prevTime + rem;
                 totalTurnaroundTime+=nextTime;
-                for(;i<n && vp[i].startTime <= nextTime;i++){
-                    queuePair temp = {vp[i].completionTime, vp[i].pid};
-                    enqueue(q1, temp);
-                } 
                 currTime = nextTime;                
                 if(prevProc->pid == "hello"){
                     prevProc->pid = qp.pid;
@@ -602,20 +616,38 @@ void mlfq(FILE *outputFile, struct Process *vp, int n, double slice1, double sli
                     prevProc->pid = "hello";                
                 }
             }
+            // can the boostTime be lesser than prevTime 
+            for(;i<n && vp[i].startTime <= *boostTime && vp[i].startTime <= currTime; i++){
+                queuePair temp = {vp[i].completionTime, vp[i].pid};
+                enqueue(q1, temp);
+            }
+            double temp = *boostTime;
             if(currTime >= *boostTime) Qboost(q1, q2, q3, boostTime, boost);
+            
+            for(;i<n && vp[i].startTime > temp && vp[i].startTime <= currTime; i++){
+                queuePair temp = {vp[i].completionTime, vp[i].pid};
+                enqueue(q1, temp);
+            }
+
+            // if a boost has occured while the process (with duration greater than time slice) has been running, 
+            // we enqueue it to q1 after its completion. else we enqueue it to q2 
+            if(flag){
+                enqueue(q1, qp);
+            } else if(!flag && qp.first > 0){
+                enqueue(q3, qp);
+            }
         }
+
+        if(currTime >= *boostTime) Qboost(q1, q2, q3, boostTime, boost);
 
         while (q3->size > 0 && q2->size == 0 && q1->size == 0) {
             queuePair qp = dequeue(q3);
             if(resptimeq(qp,vp,n)==qp.first){totalResponseTime+=currTime;}
-            int rem = qp.first;
+            rem = qp.first;
             prevTime = currTime;   // this is what our time is right now. 
+            int flag = 0;
             if(rem > slice3){       
-                nextTime = prevTime + slice3; 
-                for(;i<n && vp[i].startTime <= nextTime;i++){
-                    queuePair temp = {vp[i].completionTime, vp[i].pid};
-                    enqueue(q1, temp);
-                } 
+                nextTime = prevTime + slice3;  
                 currTime = nextTime;                
                 if(prevProc->pid == "hello"){
                     prevProc->pid = qp.pid;
@@ -632,16 +664,14 @@ void mlfq(FILE *outputFile, struct Process *vp, int n, double slice1, double sli
                     prevProc->completionTime = currTime;
                 }
                 qp.first = (rem-slice3);
-                enqueue(q3, qp);
+                if(*boostTime >= prevTime && *boostTime <= currTime){
+                    flag = 1;
+                }
             }
             else{
                 qp.first = 0;
                 nextTime = prevTime + rem;
                 totalTurnaroundTime+=nextTime;
-                for(;i<n && vp[i].startTime <= nextTime;i++){
-                    queuePair temp = {vp[i].completionTime, vp[i].pid};
-                    enqueue(q1, temp);
-                } 
                 currTime = nextTime;                
                 if(prevProc->pid == "hello"){
                     prevProc->pid = qp.pid;
@@ -662,7 +692,27 @@ void mlfq(FILE *outputFile, struct Process *vp, int n, double slice1, double sli
                     prevProc->pid = "hello";                 
                 }
             }
+
+            for(;i<n && vp[i].startTime <= *boostTime && vp[i].startTime <= currTime; i++){
+                queuePair temp = {vp[i].completionTime, vp[i].pid};
+                enqueue(q1, temp);
+            }
+
+            double temp = *boostTime;
             if(currTime >= *boostTime) Qboost(q1, q2, q3, boostTime, boost);
+            
+            for(;i<n && vp[i].startTime > temp && vp[i].startTime <= currTime; i++){
+                queuePair temp = {vp[i].completionTime, vp[i].pid};
+                enqueue(q1, temp);
+            }
+
+            // if a boost has occured while the process (with duration greater than time slice) has been running, 
+            // we enqueue it to q1 after its completion. else we enqueue it to q2 
+            if(flag){
+                enqueue(q1, qp);
+            } else if(!flag && qp.first > 0){
+                enqueue(q3, qp);
+            }
         }
 
         
@@ -719,17 +769,17 @@ int main(int argc, char *argv[]) {
         }
         numEntries++;
     }
-    // printf("%d",numEntries);
+    printf("%d",numEntries);
     FILE *outputFile = fopen(argv[2], "w");
     if (!outputFile) {
         printf("Error opening output file.\n");
         free(processes);
         return 1;
     }
-    fcfs(outputFile, processes, numEntries);
-    roundrobin(outputFile, processes, numEntries, nums[0]);
-    sjf(outputFile, processes, numEntries);
-    srtf(outputFile, processes, numEntries);
+    // fcfs(outputFile, processes, numEntries);
+    // roundrobin(outputFile, processes, numEntries, nums[0]);
+    // sjf(outputFile, processes, numEntries);
+    // srtf(outputFile, processes, numEntries);
     mlfq(outputFile, processes, numEntries, nums[1], nums[2], nums[3], nums[4]);
     fclose(inputFile);
     fclose(outputFile);
