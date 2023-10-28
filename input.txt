@@ -1,0 +1,10 @@
+read asd.txt
+write 1 asd.txt sad.txt
+read asd.txt
+write 2 asd.txt 34324213
+read asd.txt
+read sad.txt
+read asd.txt
+write 1 asd.txt dfg.txt
+read asd.txt
+exit
