@@ -15,6 +15,8 @@ typedef struct {
     char text[MAX_COMMAND_LENGTH];
 } Command;
 
+
+
 typedef struct _rwlock_t {
     sem_t readlock;
     sem_t writelock;
